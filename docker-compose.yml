@@ -1,0 +1,86 @@
+services:
+  # --------------------------
+  # Spark Master
+  # --------------------------
+  spark-master:
+    image: bitnami/spark:3.5.1
+    container_name: spark-master
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"   # Spark master port
+      - "8080:8080"   # Spark web UI
+
+  # --------------------------
+  # Spark Worker
+  # --------------------------
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    container_name: spark-worker
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+
+  # --------------------------
+  # MinIO
+  # --------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: olist_minio
+    environment:
+      MINIO_ROOT_USER: olist_user
+      MINIO_ROOT_PASSWORD: olist_pass
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./docker/minio/data:/data
+
+  # --------------------------
+  # Airflow
+  # --------------------------
+  airflow:
+    image: apache/airflow:2.9.0
+    container_name: airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./app:/opt/airflow/app
+      - ./.env:/opt/airflow/app/.env
+    ports:
+      - "8085:8080"  # Airflow UI
+    command: webserver
+    depends_on:
+      - spark-master
+      - spark-worker
+
+  # --------------------------
+  # PySpark ETL container
+  # --------------------------
+  spark-app:
+    image: bitnami/spark:3.5.1
+    container_name: spark-app
+    working_dir: /opt/spark-app
+    volumes:
+      - ./app:/opt/spark-app
+      - ./.env:/opt/spark-app/.env
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_APP_NAME=OlistETL
+    depends_on:
+      - spark-master
+      - spark-worker
+    command: bash -c "pip install minio python-dotenv pandas && /opt/bitnami/spark/bin/spark-submit /opt/spark-app/spark_transform.py"
+
+
