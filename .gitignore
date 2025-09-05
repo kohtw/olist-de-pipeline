@@ -14,3 +14,7 @@
 # MinIO / Postgres data
 minio/data/
 postgres/data/
+
+# Python
+__pycache__/
+*.pyc

@@ -1,86 +1,74 @@
 services:
-  # --------------------------
-  # Spark Master
-  # --------------------------
-  spark-master:
-    image: bitnami/spark:3.5.1
-    container_name: spark-master
-    command: bin/spark-class org.apache.spark.deploy.master.Master
+  warehouse_postgres:
+    image: postgres:15
+    container_name: warehouse_postgres
     environment:
-      - SPARK_MODE=master
+      POSTGRES_USER: olistadmin
+      POSTGRES_PASSWORD: olistadmin
+      POSTGRES_DB: dbo
     ports:
-      - "7077:7077"   # Spark master port
-      - "8080:8080"   # Spark web UI
+      - "5432:5432"
+    volumes:
+      - warehouse_postgres:/var/lib/postgresql/data
 
-  # --------------------------
-  # Spark Worker
-  # --------------------------
-  spark-worker:
-    image: bitnami/spark:3.5.1
-    container_name: spark-worker
-    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_WORKER_MEMORY=2G
-      - SPARK_WORKER_CORES=2
-    depends_on:
-      - spark-master
-
-  # --------------------------
-  # MinIO
-  # --------------------------
   minio:
     image: minio/minio:latest
-    container_name: olist_minio
     environment:
-      MINIO_ROOT_USER: olist_user
-      MINIO_ROOT_PASSWORD: olist_pass
-    ports:
-      - "9000:9000"  # MinIO API
-      - "9001:9001"  # MinIO Console
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     command: server /data --console-address ":9001"
-    volumes:
-      - ./docker/minio/data:/data
-
-  # --------------------------
-  # Airflow
-  # --------------------------
-  airflow:
-    image: apache/airflow:2.9.0
-    container_name: airflow
-    environment:
-      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./app:/opt/airflow/app
-      - ./.env:/opt/airflow/app/.env
     ports:
-      - "8085:8080"  # Airflow UI
-    command: webserver
-    depends_on:
-      - spark-master
-      - spark-worker
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
 
-  # --------------------------
-  # PySpark ETL container
-  # --------------------------
-  spark-app:
-    image: bitnami/spark:3.5.1
-    container_name: spark-app
-    working_dir: /opt/spark-app
+  spark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spark-app-container
+    depends_on:
+      - minio
     volumes:
       - ./app:/opt/spark-app
-      - ./.env:/opt/spark-app/.env
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_APP_NAME=OlistETL
+      - ./data:/data
+    command: tail -f /dev/null
+
+  airflow-webserver:
+    image: apache/airflow:2.7.3
     depends_on:
-      - spark-master
-      - spark-worker
-    command: bash -c "pip install minio python-dotenv pandas && /opt/bitnami/spark/bin/spark-submit /opt/spark-app/spark_transform.py"
+      - spark
+      - minio
+      - warehouse_postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@postgres:5432/airflow_db
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin ||
+      true &&
+      airflow webserver
+      "
 
+  airflow-scheduler:
+    image: apache/airflow:2.7.3
+    depends_on:
+      - airflow-webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://warehouse_user:warehouse_password@warehouse_postgres:5432/airflow_db
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+    command: airflow scheduler
 
+volumes:
+  minio_data:
+  postgres_data:
