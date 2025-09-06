@@ -9,13 +9,14 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - warehouse_postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
 
   minio:
     image: minio/minio:latest
+    container_name: minio
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: olist_user
+      MINIO_ROOT_PASSWORD: olist_pass
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -25,28 +26,37 @@ services:
 
   spark:
     build:
-      context: .
+      context: ./spark-app
       dockerfile: Dockerfile
     container_name: spark-app-container
+    env_file:
+      - .env
     depends_on:
       - minio
     volumes:
-      - ./app:/opt/spark-app
+      - ./spark-app:/opt/spark-app
       - ./data:/data
     command: tail -f /dev/null
 
-  airflow-webserver:
-    image: apache/airflow:2.7.3
+  airflow:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-webserver
     depends_on:
       - spark
       - minio
       - warehouse_postgres
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@postgres:5432/airflow_db
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://olistadmin:olistadmin@warehouse_postgres:5432/dbo
     volumes:
-      - ./dags:/opt/airflow/dags
-      - ./scripts:/opt/airflow/scripts
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/scripts:/opt/airflow/scripts
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
     ports:
       - "8080:8080"
     command: >
@@ -58,16 +68,22 @@ services:
       "
 
   airflow-scheduler:
-    image: apache/airflow:2.7.3
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-scheduler
     depends_on:
-      - airflow-webserver
+      - airflow
+      - warehouse_postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://warehouse_user:warehouse_password@warehouse_postgres:5432/airflow_db
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://olistadmin:olistadmin@warehouse_postgres:5432/dbo
     volumes:
-      - ./dags:/opt/airflow/dags
-      - ./scripts:/opt/airflow/scripts
-    command: airflow scheduler
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/scripts:/opt/airflow/scripts
+      - ./airflow/logs:/opt/airflow/logs
+    entrypoint: /bin/bash
+    command: -c "sleep 30 && airflow scheduler"
 
 volumes:
   minio_data:
