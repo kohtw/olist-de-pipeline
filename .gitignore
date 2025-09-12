@@ -1,16 +1,11 @@
-# VS Code
+# VSCode
 .vscode/
 
 # Env
 # .env # Exposed for the purpose of sharing environment variables in the project (Non-sensitive)
 
-# Logs / Data
+# Logs
 *.log
-*.logs
-*.pid
-*.db
-*.parquet
-*.csv
 
 # MinIO / Postgres data
 minio/data/

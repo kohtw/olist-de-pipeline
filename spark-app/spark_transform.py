@@ -12,7 +12,8 @@ load_dotenv()
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
-MINIO_BUCKET = os.getenv("MINIO_BUCKET")
+MINIO_RAW_BUCKET = os.getenv("MINIO_RAW_BUCKET")
+MINIO_PROCESSED_BUCKET = os.getenv("MINIO_PROCESSED_BUCKET")
 MINIO_SECURE = os.getenv("MINIO_SECURE") == 'True'
 
 minio_client = Minio(
@@ -27,3 +28,4 @@ spark = SparkSession.builder \
     .master("spark://spark-master:7077") \
     .getOrCreate()
 
+df_orders = spark.read.parquet(f"s3a://{MINIO_RAW_BUCKET}/staging_orders")
