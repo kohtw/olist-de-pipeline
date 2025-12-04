@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 def transform_data():
     load_dotenv()
 
+    SPARKMASTER = os.getenv("SPARK_MASTER")
 
     MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
     MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
@@ -21,10 +22,12 @@ def transform_data():
         secure=MINIO_SECURE
     )
 
+    if not minio_client.bucket_exists(MINIO_PROCESSED_BUCKET):
+        minio_client.make_bucket(MINIO_PROCESSED_BUCKET)
 
     spark = SparkSession.builder \
         .appName("OlistETL") \
-        .master("spark://spark-master:7077") \
+        .master(SPARKMASTER) \
         .getOrCreate()
 
     # sample steps, to be changed
