@@ -1,38 +1,47 @@
-# Get path
-import sys
 import os
-SCRIPTS_PATH = os.path.join(os.path.dirname(__file__), '..', 'scripts')
-if SCRIPTS_PATH not in sys.path:
-    sys.path.append(SCRIPTS_PATH)
-
-# Imports
-from ingest_minio import ingest_data
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.operators.empty import EmptyOperator
 from datetime import datetime
+import subprocess
 
-default_args = {
-    "owner": "airflow",
-    "depends_on_past": False,
-}
+from airflow import DAG
+from airflow.operators.empty import EmptyOperator
+from airflow.decorators import task
+
+from ingest_minio import ingest_data
+from minio_to_postgres import load_data
+
+TAGS = ['ingest']
 
 with DAG(
     dag_id="olist_pipeline",
     start_date=datetime(2025, 9, 4),
     schedule=None,
-    default_args=default_args,
+    default_args= {
+        "owner": "airflow",
+        "depends_on_past": False,
+    },
     catchup=False,
-    tags=["staging", "minio", "etl"]
+    tags=TAGS
 ) as dag:
 
     start = EmptyOperator(task_id="start")
 
-    ingest_task = PythonOperator(
-        task_id="ingest_data_to_minio",
-        python_callable=ingest_data
-    )
+    @task(task_id="ingest_task")
+    def ingest_task():
+        ingest_data()
+
+    @task(task_id="transform_task")
+    def transform_task():
+        subprocess.run([
+            "spark-submit",
+            "--master",
+            "spark://spark-master:7077",
+            "/path/to/airflow/scripts/transform_data.py"
+        ], check=True)
+
+    @task(task_id="load_task")
+    def load_task():
+        load_data()
 
     end = EmptyOperator(task_id="end")
 
-    start >> ingest_task >> end
+    (start >> ingest_task >> transform_task >> end)
