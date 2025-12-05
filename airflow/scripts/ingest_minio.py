@@ -21,7 +21,7 @@ def csv_to_table_name(csv_file: str) -> str:
     name = os.path.splitext(csv_file)[0]  # remove extension
     return f"staging_{name.replace('olist_', '').replace('_dataset', '')}"
 
-def ingest_data():
+def ingest_ecommerce_data():
     minio_client = Minio(
         MINIO_ENDPOINT,
         access_key=MINIO_ACCESS_KEY,

@@ -24,7 +24,7 @@ def object_to_table_name(obj_name: str) -> str:
     base = os.path.splitext(obj_name)[0]  # remove .parquet/.csv
     return f"analytics.{base}"
 
-def load_data():    
+def load_ecommerce_data():    
     minio_client = Minio(
         MINIO_ENDPOINT,
         access_key=MINIO_ACCESS_KEY,

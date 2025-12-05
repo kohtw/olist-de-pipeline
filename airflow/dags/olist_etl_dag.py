@@ -4,15 +4,16 @@ import subprocess
 
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.decorators import task
 
-from ingest_minio import ingest_data
-from minio_to_postgres import load_data
+from ingest_minio import ingest_ecommerce_data
+from minio_to_postgres import load_ecommerce_data
 
-TAGS = ['ingest']
+TAGS = ['ecommerce-ingest']
 
 with DAG(
-    dag_id="olist_pipeline",
+    dag_id="olist_ETL",
     start_date=datetime(2025, 9, 4),
     schedule=None,
     default_args= {
@@ -27,7 +28,7 @@ with DAG(
 
     @task(task_id="ingest_task")
     def ingest_task():
-        ingest_data()
+        ingest_ecommerce_data()
 
     @task(task_id="transform_task")
     def transform_task():
@@ -40,7 +41,13 @@ with DAG(
 
     @task(task_id="load_task")
     def load_task():
-        load_data()
+        load_ecommerce_data()
+
+    trigger_next = TriggerDagRunOperator(
+        task_id="trigger_dbt",
+        trigger_dag_id="dbt_build",
+        wait_for_completion=False,
+    )
 
     end = EmptyOperator(task_id="end")
 
