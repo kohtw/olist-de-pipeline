@@ -19,7 +19,7 @@ DATA_DIR = "/data/raw/"
 def csv_to_table_name(csv_file: str) -> str:
     """Convert CSV filename to staging table name."""
     name = os.path.splitext(csv_file)[0]  # remove extension
-    return f"staging_{name.replace('olist_', '').replace('_dataset', '')}"
+    return f"staging_{name.replace('_dataset', '')}"
 
 def ingest_ecommerce_data():
     minio_client = Minio(

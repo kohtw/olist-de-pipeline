@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: olist       
+    database: dbo
+    schema: analytics
+    tables:
+      - name: olist_orders
+        description: "All customer orders"
+
+      - name: olist_order_items
+        description: "Items in the customer orders"
+
+      - name: olist_order_payments
+        description: "Payment for orders"
+
+      - name: olist_order_reviews
+        description: "Order reviews"
+
+      - name: olist_products
+        description: "Product details"
+
+      - name: olist_customers
+        description: "Customer details"
+
+      - name: olist_sellers
+        description: "Seller details"
+
+      - name: product_category_name_translation
+        description: "Translation for category name from Brazilian to English"
+

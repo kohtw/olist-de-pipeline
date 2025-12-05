@@ -1,0 +1,14 @@
+olist_dbt:
+  target:
+  outputs:
+    ecommerce:
+      type: postgres
+      host: warehouse_postgres
+      user: olistadmin
+      password: olistadmin
+      port: 5432  
+      dbname: dbo
+      schema: analytics
+      threads: 1
+      autocommit: false
+      autocreate: false
