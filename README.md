@@ -2,7 +2,8 @@
 
 # olist-de-pipeline
 
-Just a personal data pipeline project I built to play around with some common data engineering tools. It processes the Olist Brazilian e-commerce dataset using Airflow, Spark, and dbt.
+Just a personal data pipeline project I built to play around with some common open sourcedata engineering tools. 
+It does batch processing from some APIs and static files.
 
 ## What this does
 
